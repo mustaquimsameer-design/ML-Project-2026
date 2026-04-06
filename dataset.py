@@ -56,14 +56,14 @@ class DatasetBase():
                 for word in infile.readlines():
                     stopwords.append(word[:-1])
 
-            data['postTweet'] = data.rawTweet.parallel_apply(
+            data['postTweet'] = data.rawTweet.apply(
                 lambda x: self.tokenize(x, stopwords=stopwords, keyword=[]))
         else:
             # get stopwords
             with open('processed/keyword.txt', 'r') as infile:
                 for word in infile.readlines():
                     keyword.append(word[:-1])
-            data['postTweet'] = data.rawTweet.parallel_apply(
+            data['postTweet'] = data.rawTweet.apply(
                 lambda x: self.tokenize(x, stopwords=[], keyword=keyword))
 
         # number of keywords >= 5

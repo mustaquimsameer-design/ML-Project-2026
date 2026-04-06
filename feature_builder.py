@@ -72,7 +72,7 @@ class MFFeatureBuilder(FeatureBuilderBase):
     def get_users2keywords(self, user2index, data, keyword_list):
         userKey = pd.DataFrame(list(user2index.keys()), columns=['name'])
         tic = time.time()
-        userKey['dist'] = userKey.name.parallel_apply(lambda x: self.get_user2keywords(data, keyword_list, x))
+        userKey['dist'] = userKey.name.apply(lambda x: self.get_user2keywords(data, keyword_list, x))
         userKey = np.array(userKey.dist.values.tolist())
         return userKey
 
@@ -89,7 +89,7 @@ class MFFeatureBuilder(FeatureBuilderBase):
     def get_tweets2keywords(self, tweet2index, keyword_list):
         tweets2keywords = pd.DataFrame(list(tweet2index.keys()), columns=['tweet'])
         tic2 = time.time()
-        tweets2keywords['dist'] = tweets2keywords.tweet.parallel_apply(lambda x: self.get_tweet2keywords(keyword_list, x))
+        tweets2keywords['dist'] = tweets2keywords.tweet.apply(lambda x: self.get_tweet2keywords(keyword_list, x))
         tweets2keywords = np.array(tweets2keywords.dist.values.tolist())
         return tweets2keywords
 

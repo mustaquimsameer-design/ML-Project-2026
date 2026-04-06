@@ -142,7 +142,9 @@ class InfoVGAETrainer(TrainerBase):
             z = self.model.encode(features)
             A_pred = self.model.decode(z)
             D_z = self.D(z)
-
+            
+            #force adj_label values greater than 1 to be 1
+            adj_label = torch.sparse.FloatTensor(adj_label._indices(), torch.clamp(adj_label._values(), max=1), adj_label.shape)
             vae_recon_loss = norm * F.binary_cross_entropy(A_pred.view(-1), adj_label.to_dense().view(-1),
                                                            weight=weight_tensor)
             kl_divergence = 0.5 / A_pred.size(0) * (1 + 2 * self.model.logstd - self.model.mean ** 2 -
