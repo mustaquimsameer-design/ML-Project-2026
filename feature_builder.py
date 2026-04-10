@@ -6,6 +6,7 @@ import numpy as np
 from pandarallel import pandarallel
 from sklearn.feature_extraction.text import TfidfVectorizer
 from collections import defaultdict
+
 pandarallel.initialize()
 
 class FeatureBuilderBase():
@@ -181,6 +182,29 @@ class MFFeatureBuilder(FeatureBuilderBase):
         else:
             raise NotImplementedError(self.module_name)
 
+    def get_label_feature_vector(self):
+        # get tweet to index mapping
+        self.tweet2index = self.get_tweet2index(self.data)
+        # get tweet to llm_label mapping
+        self.tweet2label = dict(zip(self.data.postTweet, self.data['llm_label']))
+        #get tweet to sarcasm_label mapping
+        self.tweet2sarcasm_label = dict(zip(self.data.postTweet, self.data['sarcasm_label']))
+        # get total number of nodes
+        num_nodes = len(self.tweet2index)+len(self.user2index)
+        # construct label feature vector
+        label_feature_vector = np.zeros((num_nodes, num_nodes))
+        np.fill_diagonal(label_feature_vector, 1)
+        # populate llm labels
+        if True:
+            for tweet, index in self.tweet2index.items():
+                label = self.tweet2label[tweet]
+                label_feature_vector[index, label-1] = 1
+        # populate sarcasm labels
+        if True:
+            for tweet, index in self.tweet2index.items():
+                sarcasm_label = self.tweet2sarcasm_label[tweet]
+                label_feature_vector[index, sarcasm_label+2] = 1
+        return label_feature_vector
 
 # wget http://nlp.stanford.edu/data/glove.6B.zip
 # unzip glove.6B.zip

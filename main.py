@@ -42,6 +42,10 @@ parser.add_argument('--use_feature', type=bool, default=True, help='Use feature'
 parser.add_argument('--num_user', type=int, default=None, help='Number of users, usually no need to specify.')
 parser.add_argument('--num_assertion', type=int, default=None, help='Number of assertions, usually no need to specify.')
 parser.add_argument('--pos_weight_lambda', type=float, default=1.0, help='Lambda for positive sample weight')
+parser.add_argument('--use_cross_entropy_loss', action="store_true", help='Whether to use cross entropy loss for model')
+parser.add_argument('--cross_entropy_loss_lambda', type=float, default=1, help='Lambda for cross entropy loss')
+parser.add_argument('--disable_sarcasm_features', action="store_true", help='Whether to disable sarcasm features for Twitter dataset')
+parser.add_argument('--disable_label_features', action="store_true", help='Whether to disable label features for Twitter dataset')
 
 # For Discriminator
 parser.add_argument('--gamma', type=float, default=1e-3, help='weight for tc loss')
@@ -92,8 +96,9 @@ else:
     dataset.dump_label()
 
 # Start Training
-feature = sp.diags([1.0], shape=(dataset.num_nodes, dataset.num_nodes))
-setattr(args, "input_dim", dataset.num_nodes)
+#feature = sp.diags([1.0], shape=(dataset.num_nodes, dataset.num_nodes))
+feature = dataset.feature_builder.get_label_feature_vector()
+setattr(args, "input_dim", feature.shape[1])
 trainer = InfoVGAETrainer(adj_matrix, feature, args, dataset)
 trainer.train()
 trainer.save()

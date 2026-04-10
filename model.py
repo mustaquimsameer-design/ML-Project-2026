@@ -55,6 +55,7 @@ class Discriminator(nn.Module):
 class InfoVGAE(nn.Module):
     def __init__(self, args, adj):
         super(InfoVGAE, self).__init__()
+        #self.input_dim = args.input_dim
         self.input_dim = args.input_dim
         self.adj_matrix = adj
         self.hidden1_dim = args.hidden1_dim
@@ -62,6 +63,7 @@ class InfoVGAE(nn.Module):
         self.base_gcn = GraphConvSparse(self.input_dim, self.hidden1_dim, adj, activation=F.relu)
         self.gcn_mean = GraphConvSparse(self.hidden1_dim, self.hidden2_dim, adj, activation=lambda x: x)
         self.gcn_logstddev = GraphConvSparse(self.hidden1_dim, self.hidden2_dim, adj, activation=lambda x: x)
+        self.supervised_head = nn.Linear(self.hidden2_dim, 2)
         self.args = args
 
         assert args.num_user is not None

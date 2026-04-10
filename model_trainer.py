@@ -69,9 +69,42 @@ class InfoVGAETrainer(TrainerBase):
         self.optimizer_D = None
 
         self.result_embedding = None
+        self.ce_labels = self._build_ce_labels()
 
+    def _build_ce_labels(self):
+        num_nodes = self.args.num_user + self.args.num_assertion
+        labels = torch.full((num_nodes,), -1, dtype=torch.long)
+
+        tweet_to_index = self.dataset.feature_builder.tweet2index
+        tweet_to_label = dict(zip(self.dataset.processed_data.postTweet, self.dataset.processed_data['llm_label']))
+
+        for tweet, tweet_index in tweet_to_index.items():
+            label = tweet_to_label.get(tweet, 0)
+            if label in [1, 2]:
+                labels[self.args.num_user + tweet_index] = label - 1
+
+        return labels
+
+    def get_cross_entropy_loss(self, z):
+        labels = self.ce_labels.to(z.device)
+        mask = labels >= 0
+        labeled_count = int(mask.sum().item())
+
+        if labeled_count == 0:
+            return z.new_tensor(0.0), 0, 0.0
+
+        z_labeled = z[mask]
+        labels_labeled = labels[mask]
+        logits = self.model.supervised_head(z_labeled)
+        ce_loss = F.cross_entropy(logits, labels_labeled)
+        ce_acc = (logits.argmax(dim=1) == labels_labeled).float().mean().item()
+        return ce_loss, labeled_count, ce_acc
+        
+        
+    
     def train(self):
         print("Training using {}".format(self.name))
+        print("CE supervision enabled: {}, lambda: {}".format(self.args.use_cross_entropy_loss, self.args.cross_entropy_loss_lambda))
 
         # Store original adjacency matrix (without diagonal entries) for later
         adj_orig = self.adj_matrix
@@ -151,7 +184,17 @@ class InfoVGAETrainer(TrainerBase):
                                                     torch.exp(self.model.logstd) ** 2).sum(1).mean()
             vae_tc_loss = (D_z[:, :1] - D_z[:, 1:]).mean() * self.args.gamma
             weight = PID.pid(Exp_KL, kl_divergence.item())  # get the weight on KL term with PI module
-            vae_loss = vae_recon_loss - weight * kl_divergence + vae_tc_loss
+            
+            # cross-entropy supervision on labeled assertion nodes
+            if self.args.use_cross_entropy_loss:
+                cross_entropy_loss, ce_labeled_count, ce_acc = self.get_cross_entropy_loss(z)
+            else:
+                cross_entropy_loss = z.new_tensor(0.0)
+                ce_labeled_count = 0
+                ce_acc = 0.0
+            weight_ce = self.args.cross_entropy_loss_lambda
+            
+            vae_loss = vae_recon_loss - weight * kl_divergence + vae_tc_loss + weight_ce * cross_entropy_loss
 
             self.optimizer.zero_grad()
             vae_loss.backward()
@@ -179,13 +222,16 @@ class InfoVGAETrainer(TrainerBase):
                 evaluator.run_clustering()
                 # evaluator.plot_clustering(show=False, tag=str(epoch))
                 eval_log, user_f1, asser_f1 = evaluator.numerical_evaluate()
-                log = "Epoch: {}, loss_recon: {:.5f}, loss_kl: {:.5f}, loss_tc: {:.5f}, loss_VAE: {:.5f}, loss_D: {:.5f}, user_f1: {:.5f}, asser_f1: {:.5f}".format(
+                log = "Epoch: {}, loss_recon: {:.5f}, loss_kl: {:.5f}, loss_tc: {:.5f}, loss_ce: {:.5f}, ce_n: {}, ce_acc: {:.5f}, loss_VAE: {:.5f}, loss_D: {:.5f}, user_f1: {:.5f}, asser_f1: {:.5f}".format(
                         epoch,
                         vae_recon_loss.item(),
-                        - weight * kl_divergence,
+                    (- weight * kl_divergence).item(),
                         vae_tc_loss.item(),
+                    cross_entropy_loss.item(),
+                    ce_labeled_count,
+                    ce_acc,
                         vae_loss.item(),
-                        D_tc_loss,
+                    D_tc_loss.item(),
                         user_f1,
                         asser_f1)
                 print(log)

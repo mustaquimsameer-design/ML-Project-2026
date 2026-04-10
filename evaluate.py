@@ -74,7 +74,7 @@ class Evaluator:
 
         self.user_clustering_pred, _ = self.k_means(self.embedding[:self.num_user])
         self.asser_clustering_pred, _ = self.k_means(self.embedding[self.num_user:])
-
+        
         for i in range(self.num_user):
             self.user_clustering_pred[i] = \
                 self.user_plot_config[0][0] if self.user_clustering_pred[i] == 0 else self.user_plot_config[1][0]

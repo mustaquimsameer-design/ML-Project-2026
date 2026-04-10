@@ -74,6 +74,8 @@ Evaluation will be automaticly triggered after the training process. To evaluate
 
 `--hidden2_dim`: the latent space dimension of target layer
 
+`--use_cross_entropy_loss`: whether to use an additional cross-entropy loss term based on llm-generated labels
+
 > Result
 
 `--output_path` path to save the result
