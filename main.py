@@ -97,7 +97,7 @@ else:
 
 # Start Training
 #feature = sp.diags([1.0], shape=(dataset.num_nodes, dataset.num_nodes))
-feature = dataset.feature_builder.get_label_feature_vector()
+feature = dataset.feature_builder.get_label_feature_vector(args)
 setattr(args, "input_dim", feature.shape[1])
 trainer = InfoVGAETrainer(adj_matrix, feature, args, dataset)
 trainer.train()
@@ -105,7 +105,7 @@ trainer.save()
 
 # Start Evaluation (Twitter dataset)
 print("Running Evaluation ...")
-evaluator = Evaluator()
+evaluator = Evaluator(args)
 evaluator.init_from_value(trainer.result_embedding, dataset.user_label, dataset.asser_label,
                           dataset.name_list, dataset.asserlist,
                           output_dir=args.output_path)

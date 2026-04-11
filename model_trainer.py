@@ -213,11 +213,11 @@ class InfoVGAETrainer(TrainerBase):
             self.optimizer_D.step()
 
             if epoch % 1 == 0:
-                evaluator = Evaluator()
+                evaluator = Evaluator(self.args)
                 embedding = self.model.encode(features).detach().cpu().numpy()
                 evaluator.init_from_value(embedding, self.dataset.user_label.copy(), self.dataset.asser_label.copy(),
                                           self.dataset.name_list.copy(), self.dataset.asserlist.copy(),
-                                          output_dir=self.args.output_path)
+                                          output_dir=self.args.output_path, supervised_head=self.model.supervised_head)
                 # evaluator.plot(show=False, save=True, tag=str(epoch))
                 evaluator.run_clustering()
                 # evaluator.plot_clustering(show=False, tag=str(epoch))
@@ -250,6 +250,11 @@ class InfoVGAETrainer(TrainerBase):
         with open(path + "/embedding.bin", 'wb') as fout:
             pickle.dump(self.result_embedding, fout)
             print("Embedding and dependencies are saved in {}".format(path))
+        # save the ssupervised head weights for later analysis
+        supervised_head_weights = self.model.supervised_head.weight.detach().cpu().numpy()
+        with open(path + "/supervised_head_weights.json", 'w') as fout:
+            json.dump(supervised_head_weights.tolist(), fout)
+            print("Supervised head weights are saved in {}".format(path))
 
     def get_scores(self, adj_orig, edges_pos, edges_neg, adj_rec):
         def sigmoid(x):

@@ -4,6 +4,8 @@ import json
 import time
 from sklearn import metrics
 
+import torch
+
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 unused import
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans, MeanShift, DBSCAN
@@ -11,7 +13,8 @@ from sklearn.metrics import recall_score, f1_score, precision_score, accuracy_sc
 
 
 class Evaluator:
-    def __init__(self, user_plot_config=None, asser_plot_config=None):
+    def __init__(self, args, user_plot_config=None, asser_plot_config=None):
+        self.args = args
         self.initialized = False
         self.output_dir = None
         self.embedding = None
@@ -24,6 +27,9 @@ class Evaluator:
         self.asserlist = None
         self.num_user = -1
         self.num_asser = -1
+        
+        self.supervised_head = None
+        
         self.user_plot_config = [
             [1, "#178bff", "User Con"],
             # [0, "#3b3b3b", "User Neu"],
@@ -57,23 +63,55 @@ class Evaluator:
             self.namelist = json.load(fin)
         with open(dir + "/asserlist.json", 'r') as fin:
             self.asserlist = json.load(fin)
+        head = torch.nn.Linear(2, 2)
+        with open(self.output_dir + "/supervised_head_weights.json", 'r') as fin:
+            supervised_head_weights = torch.tensor(json.load(fin))
+        # initialize model with loaded weights
+        head.weight.data = supervised_head_weights
+        head.bias.data.fill_(0)
+        self.supervised_head = head
         self.output_dir = dir
         self.initialize()
 
-    def init_from_value(self, embedding, user_label, asser_label, namelist, asserlist, output_dir="."):
+    def init_from_value(self, embedding, user_label, asser_label, namelist, asserlist, output_dir=".", supervised_head=None):
         self.embedding = embedding
         self.user_label = user_label
         self.asser_label = asser_label
         self.namelist = namelist
         self.asserlist = asserlist
         self.output_dir = output_dir
+        self.supervised_head = supervised_head
         self.initialize()
 
     def run_clustering(self, n_clusters=2):
         assert n_clusters == 2
 
-        self.user_clustering_pred, _ = self.k_means(self.embedding[:self.num_user])
-        self.asser_clustering_pred, _ = self.k_means(self.embedding[self.num_user:])
+        if not self.args.use_cross_entropy_loss:
+            self.user_clustering_pred, _ = self.k_means(self.embedding[:self.num_user])
+            self.asser_clustering_pred, _ = self.k_means(self.embedding[self.num_user:])
+        else:
+            # use supervised head weights as clustering prediction
+            # load supervised head weights
+            if self.supervised_head is not None:
+                head = self.supervised_head
+            else:
+                head = torch.nn.Linear(2, 2)
+                with open(self.output_dir + "/supervised_head_weights.json", 'r') as fin:
+                    supervised_head_weights = torch.tensor(json.load(fin))
+                # initialize model with loaded weights
+                head.weight.data = supervised_head_weights
+            head.bias.data.fill_(0)
+            #make sure everything is on cuda if needed
+            if torch.cuda.is_available() and self.embedding is not None:
+                head = head.cuda()
+                self.embedding = torch.tensor(self.embedding, dtype=torch.float32).cuda()
+            # compute clustering prediction based on supervised head weights
+            logits = head(self.embedding)
+            self.user_clustering_pred = torch.argmax(logits[:self.num_user], dim=1).detach().cpu().numpy()
+            self.asser_clustering_pred = torch.argmax(logits[self.num_user:], dim=1).detach().cpu().numpy()
+
+            # reset self.embedding to cpu numpy for later use
+            self.embedding = self.embedding.detach().cpu().numpy()
         
         for i in range(self.num_user):
             self.user_clustering_pred[i] = \

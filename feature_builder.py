@@ -182,7 +182,7 @@ class MFFeatureBuilder(FeatureBuilderBase):
         else:
             raise NotImplementedError(self.module_name)
 
-    def get_label_feature_vector(self):
+    def get_label_feature_vector(self, args):
         # get tweet to index mapping
         self.tweet2index = self.get_tweet2index(self.data)
         # get tweet to llm_label mapping
@@ -195,12 +195,12 @@ class MFFeatureBuilder(FeatureBuilderBase):
         label_feature_vector = np.zeros((num_nodes, num_nodes))
         np.fill_diagonal(label_feature_vector, 1)
         # populate llm labels
-        if True:
+        if not args.disable_label_features:
             for tweet, index in self.tweet2index.items():
                 label = self.tweet2label[tweet]
                 label_feature_vector[index, label-1] = 1
         # populate sarcasm labels
-        if True:
+        if not args.disable_sarcasm_features:
             for tweet, index in self.tweet2index.items():
                 sarcasm_label = self.tweet2sarcasm_label[tweet]
                 label_feature_vector[index, sarcasm_label+2] = 1
